@@ -9,15 +9,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@humbhionline/bap": "file:../bap.js",
+    "@humbhionline/bap": "^1.0.1",
+    "@primevue/themes": "^4.0.0",
     "lockr": "^0.9.0-beta.2",
-    "vue": "^3.4.29"
+    "primevue": "^4.0.0",
+    "vue": "^3.4.29",
+    "vue-router": "^4.4.0"
   },
   "devDependencies": {
+    "@primevue/auto-import-resolver": "^4.0.0",
     "@vitejs/plugin-vue": "^5.0.5",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4",
+    "unplugin-vue-components": "^0.27.2",
     "vite": "^5.3.1"
   }
 }
