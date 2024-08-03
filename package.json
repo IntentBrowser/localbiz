@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@humbhionline/bap": "^1.0.1",
+    "@humbhionline/bap": "file:../bap.js",
     "@primevue/themes": "^4.0.0",
     "lockr": "^0.9.0-beta.2",
     "primevue": "^4.0.0",

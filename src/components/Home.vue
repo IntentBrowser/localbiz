@@ -11,7 +11,7 @@ export default {
             n: {},
             showSettings: false,
             darkmode: Lockr.get("darkmode") || false,
-
+            autoCloseSettings: true,
         };
     },
     mounted() {
@@ -21,16 +21,13 @@ export default {
             self.location = l;
         });
         this.loadNetworkMeta();
-
     },
     computed: {
+        network_set() {
+            return this.n.name && this.n.domain && this.n.search_provider;
+        },
         ok() {
-            return (
-                this.n.name &&
-                this.n.domain &&
-                this.n.search_provider &&
-                this.location
-            );
+            return this.network_set && this.location;
         },
     },
     methods: {
@@ -49,21 +46,34 @@ export default {
             let self = this;
             if (self.network.isSet()) {
                 self.n = self.network.get();
-                self.$forceUpdate();
+                self.autoCloseSettings = false;
+            } else {
+                self.showSettings = !this.network_set;
+            }
+        },
+        checkNetworkSettings() {
+            if (this.showSettings && this.network_set && this.autoCloseSettings) {
+                this.showSettings = false;
+                this.autoCloseSettings = false;
             }
         },
         onNetworkChange(ev) {
             this.n.name = ev;
+            this.n.domain = undefined;
+            this.n.search_provider = undefined;
+            this.checkNetworkSettings();
         },
         onDomainChange(ev) {
             this.n.domain = ev;
+            this.checkNetworkSettings();
         },
         onSearchProviderChange(ev) {
             this.n.search_provider = ev;
+            this.checkNetworkSettings();
         },
         settings(ev) {
-            this.showSettings = !this.showSettings
-        }
+            this.showSettings = !this.showSettings;
+        },
     },
 };
 </script>
@@ -71,7 +81,7 @@ export default {
     <div>
         <div>
             <div class="absolute top-1 right-1">
-                <Button icon="fas fa-gear text-xl" value="settings" @click="settings($event)" />
+                <Button icon="fas fa-bars text-xl" value="settings" @click="settings($event)" />
             </div>
             <Drawer v-model:visible="showSettings" position="right">
                 <template #header>
@@ -80,17 +90,25 @@ export default {
                         <span class="font-bold">Settings</span>
                     </div>
                     <ToggleButton v-model="darkmode" onLabel="Bright" offLabel="Dark" onIcon="fa-sun fa-regular"
-                        offIcon="fa-regular fa-moon" @update:model-value='onDarkModeSelect($event)'>
+                        offIcon="fa-regular fa-moon" @update:model-value="onDarkModeSelect($event)">
                     </ToggleButton>
                 </template>
                 <div>
-                    <Networks :network="network" @onNetworkChange="onNetworkChange($event)"
-                        @onDomainChange="onDomainChange($event)"
+                    <Networks :autoCloseSettings="autoCloseSettings" :network="network"
+                        @onNetworkChange="onNetworkChange($event)" @onDomainChange="onDomainChange($event)"
                         @onSearchProviderChange="onSearchProviderChange($event)" />
                 </div>
-
             </Drawer>
             <Flow v-if="ok" id="flow" :location="location" :domain="n.domain" :search_provider="n.search_provider" />
+            <div class="flex justify-center mt-40 font-extrabold text-xl text-red-600" v-else>
+                <div v-if="!network_set">
+                    Please set your network.
+                </div>
+                <div v-else>
+                    Please give permission to access location.
+                </div>
+
+            </div>
         </div>
     </div>
 </template>

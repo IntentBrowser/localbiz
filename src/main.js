@@ -6,10 +6,7 @@ import App from "./App.vue";
 import QtyInput from "./components/QtyInput.vue";
 import Home from "./components/Home.vue";
 
-const routes = [
-    { path: "/", component: Home },
-    { path: "/qty", component: QtyInput },
-];
+const routes = [{ path: "/", component: Home }];
 
 const router = createRouter({
     history: createWebHistory(),

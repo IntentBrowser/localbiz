@@ -5,6 +5,7 @@ import Providers from "./Providers.vue";
 export default {
     props: ["id", "location", "domain", "search_provider"],
     data() {
+        let params = new URL(window.location).searchParams;
         return {
             network: bap.network(),
             transactions: undefined,
@@ -13,17 +14,28 @@ export default {
             catalog: {},
             search_transaction: undefined,
             viewCarts: false,
+            searchState: {
+                provider_id: params.get("provider_id"),
+                complete: true,
+            },
         };
     },
     created() {
         this.initializeCart(false);
+        if (this.searchState.provider_id) {
+            this.search(null);
+        }
     },
     methods: {
         firstOpenCart: function () {
             let self = this;
             let firstOpenCart = self.carts.find((cart) => {
-                return cart.select.request && cart.select.request.message && cart.select.request.message.order
-            })
+                return (
+                    cart.select.request &&
+                    cart.select.request.message &&
+                    cart.select.request.message.order
+                );
+            });
             return firstOpenCart;
         },
         openCartsDrawer: function () {
@@ -40,12 +52,18 @@ export default {
                 cart.search.request.message.intent.location ||= {
                     gps: `${this.location.latitude},${this.location.longitude}`,
                 };
-                if (!cart.select.request || !cart.select.request.message || !cart.select.request.message.order) {
-                    transaction_ids.push(cart.search.request.context.transaction_id);
+                if (
+                    !cart.select.request ||
+                    !cart.select.request.message ||
+                    !cart.select.request.message.order
+                ) {
+                    transaction_ids.push(
+                        cart.search.request.context.transaction_id,
+                    );
                 }
             });
             transaction_ids.forEach((txnId) => {
-                this.transactions.close_cart(txnId)
+                this.transactions.close_cart(txnId);
             });
 
             let cart = this.transactions.new_cart();
@@ -53,7 +71,14 @@ export default {
             cart.search.request.message.intent.location ||= {
                 gps: `${this.location.latitude},${this.location.longitude}`,
             };
-            this.search_transaction = this.transactions.transaction(cart.search.request.context.transaction_id);
+            if (this.searchState.provider_id) {
+                cart.search.request.message.intent.provider = {
+                    id: this.searchState.provider_id,
+                };
+            }
+            this.search_transaction = this.transactions.transaction(
+                cart.search.request.context.transaction_id,
+            );
             if (reset) {
                 this.catalog = {};
                 this.providers = [];
@@ -72,16 +97,15 @@ export default {
                 var mQ = window.matchMedia && matchMedia("(pointer:coarse)");
                 if (mQ && mQ.media === "(pointer:coarse)") {
                     hasTouchScreen = !!mQ.matches;
-                } else if ('orientation' in window) {
+                } else if ("orientation" in window) {
                     hasTouchScreen = true; // deprecated, but good fallback
                 } else {
                     // Only as a last resort, fall back to user agent sniffing
                     var UA = navigator.userAgent;
-                    hasTouchScreen = (
+                    hasTouchScreen =
                         /\b(BlackBerry|webOS|iPhone|IEMobile)\b/i.test(UA) ||
                         /\b(Android|Windows Phone|iPad|iPod)\b/i.test(UA) ||
-                        /\b(Mobile)\b/i.test(UA)
-                    );
+                        /\b(Mobile)\b/i.test(UA);
                 }
             }
 
@@ -90,38 +114,52 @@ export default {
         onCheckOutCart: function (cart) {
             let self = this;
 
-            if (!cart.select.request || !cart.select.request.message || !cart.select.request.message.order) {
-                let context = cart.search.request.context;
+            if (
+                !cart.select.request ||
+                !cart.select.request.message ||
+                !cart.select.request.message.order
+            ) {
                 //This is the search cart
+                //let context = cart.search.request.context;
                 //this.transactions.close_cart(context.transaction_id);
                 return;
             }
             let context = cart.select.request.context;
-            let current_transaction = self.transactions.transaction(context.transaction_id)
+            let current_transaction = self.transactions.transaction(
+                context.transaction_id,
+            );
 
             let order = cart.select.request.message.order;
 
             if (!context.bpp_url) {
                 cart.confirm.request ||= {};
-                cart.confirm.request.context ||= JSON.parse(JSON.stringify(context)); // Clone
+                cart.confirm.request.context ||= JSON.parse(
+                    JSON.stringify(context),
+                ); // Clone
                 delete cart.confirm.request.context.message_id;
                 cart.confirm.request.message ||= {};
                 cart.confirm.request.message.order = order;
                 current_transaction.confirm().then(() => {
-                    let msg = "";
+                    let msg = "\n";
                     order.items.forEach((i) => {
-                        msg += `${i.descriptor.long_desc}(${i.quantity.selected.count}) `
+                        msg += `* ${i.descriptor.long_desc}(${i.quantity.selected.count})\n`;
                     });
                     let waurl = "whatsapp://send";
                     if (!this.isMobile()) {
                         waurl = "https://web.whatsapp.com/send";
                     }
+                    msg += `\n https://www.google.com/maps/place/${this.location.latitude},${this.location.longitude}`;
 
-                    waurl += "?phone=" + order.provider.fulfillments[0].contact.phone + "&text=" +
-                        encodeURIComponent("I would like to order with you " + msg);
+                    waurl +=
+                        "?phone=" +
+                        order.provider.fulfillments[0].contact.phone +
+                        "&text=" +
+                        encodeURIComponent(
+                            "I would like to order with you " + msg,
+                        );
 
                     console.log(waurl);
-                    window.open(waurl, '_blank');
+                    window.open(waurl, "_blank");
                     //this.transactions.close_cart(context.transaction_id);
                     if (this.carts.length == 0 || !this.firstOpenCart()) {
                         this.initializeCart(true);
@@ -131,35 +169,45 @@ export default {
             } else {
                 //Continuw with select, init, confirm.. TODO
             }
-
         },
         findCart: function (provider, location) {
-            let cart =
-                this.carts.find((cart) => {
-                    return (cart.select.request &&
-                        cart.select.request.context.bpp_id == provider.context.bpp_id &&
-                        cart.select.request.message &&
-                        cart.select.request.message.order &&
-                        provider.id == cart.select.request.message.order.provider.id &&
-                        location.id == cart.select.request.message.order.provider.locations[0].id);
-                });
+            let cart = this.carts.find((cart) => {
+                return (
+                    cart.select.request &&
+                    cart.select.request.context.bpp_id ==
+                    provider.context.bpp_id &&
+                    cart.select.request.message &&
+                    cart.select.request.message.order &&
+                    provider.id ==
+                    cart.select.request.message.order.provider.id &&
+                    location.id ==
+                    cart.select.request.message.order.provider.locations[0]
+                        .id
+                );
+            });
             return cart;
         },
         cart: function (provider, location) {
-
-            let cart = this.findCart(provider, location) || this.transactions.new_cart();
+            let cart =
+                this.findCart(provider, location) ||
+                this.transactions.new_cart();
             cart.search.request.context ||= {};
             cart.search.response ||= {};
-            cart.search.response.context ||= { ...provider.context, ...cart.search.request.context };
+            cart.search.response.context ||= {
+                ...provider.context,
+                ...cart.search.request.context,
+            };
 
             cart.select.request ||= {};
             cart.select.request.context ||= cart.search.response.context;
             cart.select.request.message ||= {};
             cart.select.request.message.order ||= {};
-            cart.select.request.message.order.provider ||= JSON.parse(JSON.stringify(provider));
+            cart.select.request.message.order.provider ||= JSON.parse(
+                JSON.stringify(provider),
+            );
             let final_provider = cart.select.request.message.order.provider;
             let final_location = JSON.parse(JSON.stringify(location));
-            delete final_location.items
+            delete final_location.items;
 
             final_provider.locations = [];
             final_provider.locations.push(final_location);
@@ -170,12 +218,25 @@ export default {
             delete final_provider.items;
             delete final_provider.fulfillments;
             delete final_provider.payments;
-            Object.keys(final_fulfillments).forEach(k => {
-                final_provider.fulfillments ||= [];
-                final_provider.fulfillments.push(final_fulfillments[k]);
+            final_provider.fulfillments ||= [];
+            Object.keys(final_fulfillments).forEach((k) => {
+                let f = final_fulfillments[k];
+                if (k == "HOME-DELIVERY") {
+                    f.stops ||= [];
+                    f.stops.push({
+                        location: final_provider.locations[0],
+                    });
+                    f.stops.push({
+                        location: {
+                            gps: `${this.location.latitude},${this.location.longitude}`,
+                        },
+                    });
+                }
+                final_provider.fulfillments.push(f);
             });
 
-            cart.select.request.message.order.provider.locations = final_provider.locations;
+            cart.select.request.message.order.provider.locations =
+                final_provider.locations;
 
             // Mo Message.
             return cart;
@@ -199,27 +260,30 @@ export default {
             let order = cart.select.request.message.order;
 
             let index = order.items.findIndex((i) => {
-                return item.id == i.id
+                return item.id == i.id;
             });
             order.items.splice(index, 1);
             if (order.items.length == 0) {
-                self.transactions.close_cart(cart.select.request.context.transaction_id);
+                self.transactions.close_cart(
+                    cart.select.request.context.transaction_id,
+                );
             } else {
                 self.network.persist();
             }
         },
         search: function (ev) {
-
             ev && ev.preventDefault();
             let self = this;
             this.catalog = {};
             this.providers = [];
+            this.searchState.complete = false;
 
             self.search_transaction.search().then((response) => {
                 if (response.message.ack.status == "ACK") {
                     self.search_transaction.read_events(
-                        self.search_transaction.payload("search").request.context.message_id,
-                        self.on_search
+                        self.search_transaction.payload("search").request
+                            .context.message_id,
+                        self.on_search,
                     );
                 }
             });
@@ -231,7 +295,9 @@ export default {
             meta.context = context;
             meta.providers ||= {};
             if (!meta.providers[provider.id]) {
-                meta.providers[provider.id] = JSON.parse(JSON.stringify(provider));
+                meta.providers[provider.id] = JSON.parse(
+                    JSON.stringify(provider),
+                );
                 self.providers.push(provider);
             } else {
                 return;
@@ -259,30 +325,39 @@ export default {
                 p.items[i.id] ||= i;
                 i.location_ids.forEach((location_id) => {
                     p.locations[location_id].items ||= {};
-                    p.locations[location_id].items[i.id] = JSON.parse(JSON.stringify(i));
-                    let openCart = this.findCart(provider, p.locations[location_id]);
+                    p.locations[location_id].items[i.id] = JSON.parse(
+                        JSON.stringify(i),
+                    );
+                    let openCart = this.findCart(
+                        provider,
+                        p.locations[location_id],
+                    );
                     if (openCart) {
-                        let cart_quantity = this.get_selected_quantity(openCart, i);
+                        let cart_quantity = this.get_selected_quantity(
+                            openCart,
+                            i,
+                        );
                         if (cart_quantity) {
-                            p.locations[location_id].items[i.id].quantity = cart_quantity;
+                            p.locations[location_id].items[i.id].quantity =
+                                cart_quantity;
                         }
                     }
-                    p.locations[location_id].items[i.id].quantity.selected ||= { "count": 0 };
-
+                    p.locations[location_id].items[i.id].quantity.selected ||= {
+                        count: 0,
+                    };
                 });
             });
-
-
         },
         get_selected_quantity(cart, item) {
-            let request = cart.select.request
+            let request = cart.select.request;
             let message = request ? request.message : undefined;
             let order = message ? message.order : undefined;
-            let selected_item = order.items.find((i) => (i.id == item.id));
+            let selected_item = order.items.find((i) => i.id == item.id);
             return selected_item ? selected_item.quantity : undefined;
         },
         on_search: function (response) {
             if (!response) {
+                this.searchState.complete = true;
                 return; // Done.
             }
             let self = this;
@@ -305,11 +380,12 @@ export default {
     <div class="mx-5 mt-20">
         <div class="flex justify-center" v-if="search_transaction">
             <form class="flex justify-center sm:w-full md:w-1/2">
-                <InputText type="text" v-model="search_transaction.payload('search').
-                    request.message.intent.descriptor.long_desc" placeholder=" What are you looking for?"
-                    class="w-full" :id="id + '_text'" v-if="!domain.meta.used_for_transport"></InputText>
-                <Button :id="id + '_btn'" class="ml-2 w-fit" @click="search($event)" type="submit">
-                    Search
+                <InputText type="text" v-model="search_transaction.payload('search').request.message
+                    .intent.descriptor.long_desc
+                    " placeholder=" What are you looking for?" class="w-full" :id="id + '_text'"
+                    v-if="!domain.meta || !domain.meta.used_for_transport"></InputText>
+                <Button :id="id + '_btn'" class="ml-2 px-6" @click="search($event)" type="submit"
+                    :loading="!searchState.complete" label="Search" icon="fa-solid fa-search">
                 </Button>
             </form>
         </div>
@@ -326,48 +402,72 @@ export default {
                                         <div class="font-bold m-1 w-full">
                                             {{ item.descriptor.long_desc }}
                                         </div>
-                                        <div class="text-sm font-bold m-1 w-full">
-                                            {{ provider.descriptor.name }}/{{
-                                                location.descriptor.name
-                                            }}
+                                        <div class="text-sm font-medium m-1 w-full">
+                                            <a class="text-blue-900 hover:underline" :href="'?provider_id=' +
+                                                provider.id
+                                                ">
+                                                {{
+                                                    provider.descriptor.name
+                                                }}/{{
+                                                    location.descriptor.name
+                                                }}
+                                            </a>
                                         </div>
                                         <div class="w-full">
-                                            <Badge class="text-xs m-1 px-2" v-for="(cid, ci) in item.category_ids">
+                                            <Badge severity="info" class="text-xs m-1 px-2" v-for="(
+                                                    cid, ci
+                                                ) in item.category_ids">
                                                 {{
-                                                    (ci > 0 ? "&nbsp;" : "") +
-                                                    provider
-                                                        .categories[cid].descriptor
-                                                        .long_desc
+                                                    provider.categories[cid]
+                                                        .descriptor.long_desc
                                                 }}
                                             </Badge>
                                         </div>
                                         <div class="w-full">
-                                            <Chip class="text-xs my-1" v-for="(
-                                                fid, fi
-                                            ) in item.fulfillment_ids">
-                                                {{ fid }}&nbsp;
-                                            </Chip>
+                                            <Badge severity="secondary" class="text-xs my-1" v-for="(
+                                                    fid, fi
+                                                ) in item.fulfillment_ids">
+                                                {{ fid }}
+                                            </Badge>
+                                        </div>
+                                        <div class="w-full">
+                                            <Badge severity="info" class="text-xs m-1 px-2" v-for="(
+                                                    pid, pi
+                                                ) in item.payment_ids">
+                                                {{ pid }}
+                                            </Badge>
                                         </div>
                                     </div>
                                     <div class="w-1/4 mt-1">
-                                        <!-- image content-->
-
-                                        <img class="h-full w-full" v-bind:src="item.descriptor.images[0].url" />
+                                        <img class="h-full w-full" v-bind:src="item.descriptor.images[0].url
+                                            " />
                                     </div>
                                 </div>
                                 <div class="flex">
                                     <div class="w-full text-xs flex justify-end">
                                         <div class="w-1/3 m-1">
-                                            <QtyInput v-bind:key="'count_' + item.id" v-bind:item="item"
-                                                v-model="item.quantity.selected.count"
-                                                @cart-item-qty-changed="changeItemQuantityInCart($event, provider, location)"
-                                                @cart-item-added="addItemToCart($event, provider, location)"
-                                                @cart-item-removed="removeItemFromCart($event, provider, location)" />
+                                            <QtyInput v-bind:key="'count_' + item.id" v-bind:item="item" v-model="item.quantity.selected.count
+                                                " @cart-item-qty-changed="
+                                                    changeItemQuantityInCart(
+                                                        $event,
+                                                        provider,
+                                                        location,
+                                                    )
+                                                    " @cart-item-added="
+                                                        addItemToCart(
+                                                            $event,
+                                                            provider,
+                                                            location,
+                                                        )
+                                                        " @cart-item-removed="
+                                                            removeItemFromCart(
+                                                                $event,
+                                                                provider,
+                                                                location,
+                                                            )
+                                                            " />
                                         </div>
-                                        <div class="w-1/3 flex justify-end m-2">
-                                            <span v-for="(pid, pi) in item.payment_ids">
-                                                {{ pid }}&nbsp;
-                                            </span>
+                                        <div class="w-1/3 flex justify-end mx-6">
                                             <span class="font-bold line-through" v-if="
                                                 item.price.listed_value >
                                                 item.price.value
@@ -383,7 +483,6 @@ export default {
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -403,7 +502,6 @@ export default {
             <div>
                 <Providers :carts="carts" @onCheckOutCart="onCheckOutCart($event)" />
             </div>
-
         </Drawer>
     </div>
 </template>
