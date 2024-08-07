@@ -67,6 +67,7 @@ export default {
             });
 
             let cart = this.transactions.new_cart();
+            cart.search.request.context.ttl = "PT6S";
             cart.search.request.message.intent.descriptor ||= {};
             cart.search.request.message.intent.location ||= {
                 gps: `${this.location.latitude},${this.location.longitude}`,
@@ -221,16 +222,14 @@ export default {
             final_provider.fulfillments ||= [];
             Object.keys(final_fulfillments).forEach((k) => {
                 let f = final_fulfillments[k];
-                if (k == "HOME-DELIVERY") {
-                    f.stops ||= [];
-                    f.stops.push({
-                        location: final_provider.locations[0],
-                    });
-                    f.stops.push({
+                if (f.type == "HOME-DELIVERY") {
+                    f.stops = [{
+                        location: final_provider.locations[0]
+                    }, {
                         location: {
                             gps: `${this.location.latitude},${this.location.longitude}`,
                         },
-                    });
+                    }];
                 }
                 final_provider.fulfillments.push(f);
             });
@@ -389,17 +388,17 @@ export default {
                 </Button>
             </form>
         </div>
-        <div class="flex justify-start mt-10">
-            <div class="sm:w-full md:w-1/4" v-for="(bpp, bpp_id) in catalog">
+        <div class="justify-start mt-10">
+            <div class="w-full " v-for="(bpp, bpp_id) in catalog">
                 <div class="w-full" v-for="(provider, provider_id) in bpp.providers">
-                    <div class="w-full" v-for="(location, location_id) in provider.locations">
-                        <div class="w-full" v-for="(item, item_id) in location.items">
+                    <div class="w-full flex-wrap flex" v-for="(location, location_id) in provider.locations">
+                        <div class="m-1 w-1/3" v-for="(item, item_id) in location.items">
                             <!-- Items at a location index method on_search fixes this-->
-                            <div v-bind:key="item.id" class="w-full border-2 rounded-lg p-1 border-emerald-500">
+                            <div v-bind:key="item.id" class="border-2 rounded-lg p-1 border-emerald-500 w-full">
                                 <div class="flex">
                                     <div class="w-3/4">
                                         <!-- Text Content -->
-                                        <div class="font-bold m-1 w-full">
+                                        <div class="font-bold m-1 w-full truncate">
                                             {{ item.descriptor.long_desc }}
                                         </div>
                                         <div class="text-sm font-medium m-1 w-full">
@@ -413,8 +412,8 @@ export default {
                                                 }}
                                             </a>
                                         </div>
-                                        <div class="w-full">
-                                            <Badge severity="info" class="text-xs m-1 px-2" v-for="(
+                                        <div class="w-full flex overflow-x-scroll">
+                                            <Badge severity="info" class="whitespace-nowrap text-xs m-1 px-1" v-for="(
                                                     cid, ci
                                                 ) in item.category_ids">
                                                 {{
@@ -427,7 +426,7 @@ export default {
                                             <Badge severity="secondary" class="text-xs my-1" v-for="(
                                                     fid, fi
                                                 ) in item.fulfillment_ids">
-                                                {{ fid }}
+                                                {{ provider.fulfillments[fid].type }}
                                             </Badge>
                                         </div>
                                         <div class="w-full">
@@ -438,8 +437,8 @@ export default {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div class="w-1/4 mt-1">
-                                        <img class="h-full w-full" v-bind:src="item.descriptor.images[0].url
+                                    <div class="w-20 mt-1">
+                                        <img class="w-full h-full" v-bind:src="item.descriptor.images[0].url
                                             " />
                                     </div>
                                 </div>
@@ -492,7 +491,7 @@ export default {
         </div>
     </div>
     <div>
-        <Drawer v-model:visible="viewCarts" position="bottom" class="!h-2/3 md:!w-2/3 mb-10">
+        <Drawer v-model:visible="viewCarts" position="bottom" class="!h-4/5 md:!w-1/3 m-10">
             <template #header>
                 <div class="flex items-center gap-2">
                     <Avatar image="/images/logo.jpeg" />
