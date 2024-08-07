@@ -383,12 +383,12 @@ export default {
                     .intent.descriptor.long_desc
                     " placeholder=" What are you looking for?" class="w-full" :id="id + '_text'"
                     v-if="!domain.meta || !domain.meta.used_for_transport"></InputText>
-                <Button :id="id + '_btn'" class="ml-2 px-6" @click="search($event)" type="submit"
-                    :loading="!searchState.complete" label="Search" icon="fa-solid fa-search">
+                <Button :id="id + '_btn'" class="ml-2 px-6" @click="search($event)" type="submit" label="Search"
+                    :icon="!searchState.complete ? 'fa-solid fa-circle-notch fa-spin-pulse' : 'fa-solid fa-search'">
                 </Button>
             </form>
         </div>
-        <div class="justify-start mt-10">
+        <div class=" justify-start mt-10">
             <div class="w-full " v-for="(bpp, bpp_id) in catalog">
                 <div class="w-full" v-for="(provider, provider_id) in bpp.providers">
                     <div class="w-full flex-wrap flex" v-for="(location, location_id) in provider.locations">
@@ -459,12 +459,12 @@ export default {
                                                             location,
                                                         )
                                                         " @cart-item-removed="
-                                                            removeItemFromCart(
-                                                                $event,
-                                                                provider,
-                                                                location,
-                                                            )
-                                                            " />
+                                                                        removeItemFromCart(
+                                                                            $event,
+                                                                            provider,
+                                                                            location,
+                                                                        )
+                                                                        " />
                                         </div>
                                         <div class="w-1/3 flex justify-end mx-6">
                                             <span class="font-bold line-through" v-if="
